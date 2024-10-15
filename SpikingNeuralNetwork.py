@@ -2,28 +2,8 @@ import torch
 import numpy as np
 import torchvision
 import os
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
 
-
-class SurrogateGradientSpike(torch.autograd.Function):
-    scale = 100.0  # 기울기 정도를 조절
-
-    @staticmethod
-    def forward(ctx, input):
-        ctx.save_for_backward(input)
-        out = torch.zeros_like(input)
-        out[input > 0] = 1.0  # 스파이크 여부를 판단
-
-        return out
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (input,) = ctx.saved_tensors
-        grad_input = grad_output.clone()
-        grad = grad_input / (SurrogateGradientSpike.scale * torch.abs(input) + 1.0) ** 2
-
-        return grad
+from SurrogateGradient import SurrogateGradientSpike
 
 
 class Tutorial3_SNN_Runner:
@@ -39,6 +19,8 @@ class Tutorial3_SNN_Runner:
     alpha = float(np.exp(-time_step / tau_syn))  # He 초기값
     beta = float(np.exp(-time_step / tau_mem))  # He 초기값
     weight_scale = 0.2  # He 초기값
+    weight_list = None
+    device = None
     spike_fn = SurrogateGradientSpike.apply
 
     @classmethod
@@ -110,17 +92,17 @@ class Tutorial3_SNN_Runner:
                 coo[1].extend(times)
                 coo[2].extend(units)
 
-            device = cls._get_pytorch_device()
+            cls.device = cls._get_pytorch_device()
 
-            i = torch.LongTensor(coo).to(device)
-            v = torch.FloatTensor(np.ones(len(coo[0]))).to(device)
+            i = torch.LongTensor(coo).to(cls.device)
+            v = torch.FloatTensor(np.ones(len(coo[0]))).to(cls.device)
 
             X_batch = torch.sparse.FloatTensor(
                 i, v, torch.Size([batch_size, nb_steps, nb_units])
-            ).to(device)
-            y_batch = torch.tensor(labels_[batch_index], device=device)
+            ).to(cls.device)
+            y_batch = torch.tensor(labels_[batch_index], device=cls.device)
 
-            yield X_batch.to(device=device), y_batch.to(device=device)
+            yield X_batch.to(device=cls.device), y_batch.to(device=cls.device)
 
             counter += 1
 
@@ -195,7 +177,7 @@ class Tutorial3_SNN_Runner:
         h = torch.einsum(
             "abc,cd->abd", (inputs, weight_list[0])
         )  # weight_list는 은닉층 가중치 리스트
-        syn = torch.zeros(
+        syn = torch.zeros(  # TODO Error 수정
             (cls.batch_size, cls.nb_hidden_list[0]), device=cls.device, dtype=cls.dtype
         )
         mem = torch.zeros(
@@ -234,7 +216,7 @@ class Tutorial3_SNN_Runner:
         )  # spk_rec.shape: (100, 256, 100), (nb_steps, batch_size, hidden_layer_node)
 
         # 출력층 계산
-        h_out = torch.einsum("abc,cd->abd", (spk_rec, cls.w_out))
+        h_out = torch.einsum("abc,cd->abd", (spk_rec, weight_list[-1]))
         flt = torch.zeros(
             (cls.batch_size, cls.nb_outputs), device=cls.device, dtype=cls.dtype
         )
@@ -257,8 +239,8 @@ class Tutorial3_SNN_Runner:
         return out_rec, other_recs
 
     @classmethod
-    def train(cls, x_data, y_data, weight_list, lr=1e-3, nb_epochs=10):
-        params = weight_list + [cls.w_out]  # weight_list로 은닉층 가중치를 전달받음
+    def train(cls, x_data, y_data, lr=1e-3, nb_epochs=10):
+        params = cls.weight_list  # 이제 weight_list에 출력층 가중치도 포함
         optimizer = torch.optim.Adamax(params, lr=lr, betas=(0.9, 0.999))
 
         log_softmax_fn = torch.nn.LogSoftmax(dim=1)
@@ -270,9 +252,7 @@ class Tutorial3_SNN_Runner:
             for x_local, y_local in cls.sparse_data_generator(
                 x_data, y_data, cls.batch_size, cls.nb_steps, cls.nb_inputs
             ):
-                output, recs = cls.run_snn(
-                    x_local.to_dense(), weight_list
-                )  # weight_list를 run_snn에 전달
+                output, recs = cls.run_snn(x_local.to_dense(), cls.weight_list)
                 _, spks = recs  # 막전위 기록, 스파이크 기록
                 m, _ = torch.max(output, 1)
                 log_p_y = log_softmax_fn(m)
@@ -294,22 +274,3 @@ class Tutorial3_SNN_Runner:
             loss_hist.append(mean_loss)
 
         return loss_hist
-
-
-class Result_Plot:
-    @classmethod
-    def plot_voltage_traces(cls, mem, spk=None, dim=(3, 5), spike_height=5):
-        gs = GridSpec(*dim)
-        if spk is not None:
-            dat = 1.0 * mem
-            dat[spk > 0.0] = spike_height
-            dat = dat.detach().cpu().numpy()
-        else:
-            dat = mem.detach().cpu().numpy()
-        for i in range(np.prod(dim)):
-            if i == 0:
-                a0 = ax = plt.subplot(gs[i])
-            else:
-                ax = plt.subplot(gs[i], sharey=a0)
-            ax.plot(dat[i])
-            ax.axis("off")
