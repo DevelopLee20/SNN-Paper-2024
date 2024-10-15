@@ -15,8 +15,8 @@ seed = 1004
 np.random.seed(seed)
 torch.manual_seed(seed)
 
-nb_hidden = [[100], [100, 100], [100, 100, 100]]
-nb_epochs = [5, 10, 15]
+nb_hidden = [[100, 100, 100], [100, 100], [100]]
+nb_epochs = [5, 10, 15, 50, 100]
 
 for hidden in nb_hidden:
     for epochs in nb_epochs:
