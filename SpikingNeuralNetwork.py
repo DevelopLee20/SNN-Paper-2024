@@ -2,8 +2,20 @@ import torch
 import numpy as np
 import torchvision
 import os
+import logging
+import time
 
 from SurrogateGradient import SurrogateGradientSpike
+
+# 기본 설정
+logging.basicConfig(
+    level=logging.DEBUG,  # 로그 레벨 설정
+    format="%(asctime)s - %(levelname)s - %(message)s",  # 로그 메시지 형식
+    handlers=[
+        logging.FileHandler("Tutorial3.log"),  # 로그를 기록할 파일 설정
+        logging.StreamHandler(),  # 콘솔에 로그 출력
+    ],
+)
 
 
 class Tutorial3_SNN_Runner:
@@ -301,6 +313,12 @@ class Tutorial3_SNN_Runner:
         log_softmax_fn = torch.nn.LogSoftmax(dim=1)
         loss_fn = torch.nn.NLLLoss()
 
+        logging.info(f"Training Start, Device: {cls.device}")
+        logging.info(f"Epochs: {cls.nb_epochs}")
+        logging.info(f"Hidden Layer: {cls.nb_hidden}")
+        logging.info(f"Batch Size: {cls.batch_size}")
+        start = time.time()
+
         loss_hist = []
         for e in range(cls.nb_epochs):
             local_loss = []
@@ -335,8 +353,13 @@ class Tutorial3_SNN_Runner:
                 local_loss.append(loss_val.item())
 
             mean_loss = np.mean(local_loss)
-            print(f"Epoch {e + 1}: loss = {mean_loss:.5f}")
+            # print(f"Epoch {e + 1}: loss = {mean_loss:.5f}")
             loss_hist.append(mean_loss)
+
+            logging.info(f"Epoch {e + 1}: loss = {mean_loss:.5f}")
+
+        end = time.time()
+        logging.info(f"Training End, Execution Time: {(end - start):.2f}")
 
         return loss_hist
 
