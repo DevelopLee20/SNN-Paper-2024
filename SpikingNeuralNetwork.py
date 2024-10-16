@@ -3,6 +3,8 @@ import numpy as np
 import torchvision
 import os
 import logging
+import pickle
+import time
 
 from SurrogateGradient import SurrogateGradientSpike
 
@@ -201,6 +203,8 @@ class Tutorial3_SNN_Runner:
         )
         cls.w2 = w2
 
+        logging.info("weight init done.")
+
     @classmethod
     def run_snn_h1(cls, inputs):
         h1 = torch.einsum("abc,cd->abd", (inputs, cls.w1))
@@ -252,13 +256,27 @@ class Tutorial3_SNN_Runner:
 
         out_rec = torch.stack(out_rec, dim=1)
         other_recs = [mem_rec, spk_rec]
+
         return out_rec, other_recs
+
+    @classmethod
+    def run_snn_h2(cls, inputs):
+        pass
+
+    def run_snn_h3(cls, inputs):
+        pass
 
     @classmethod
     def train(cls, x_data, y_data, lr=1e-3, nb_epochs=10):
 
         if len(cls.nb_hidden) == 1:
             snn_runner = cls.run_snn_h1
+
+        if len(cls.nb_hidden) == 2:
+            snn_runner = cls.run_snn_h2
+
+        if len(cls.nb_hidden) == 3:
+            snn_runner = cls.run_snn_h3
 
         params = [cls.w1, cls.w2]
         optimizer = torch.optim.Adamax(params, lr=lr, betas=(0.9, 0.999))
@@ -312,32 +330,74 @@ class Tutorial3_SNN_Runner:
             accs.append(tmp)
         return np.mean(accs)
 
+    @classmethod
+    def trainer(cls, params_dict: dict):
+        logging.info("Trainer Start")
+        cls.set_download_FashionMNIST()
+        logging.info(f"Data Size: {cls.x_train.shape} {cls.x_test.shape}")
+        cls.set_pytorch_device()
+        logging.info(f"Hidden count: {len(params_dict['nb_hidden'])}")
+        logging.info(f"Epochs count: {len(params_dict['nb_epochs'])}")
+        logging.info(f"lr count: {len(params_dict['lr'])}")
+        total_model = (
+            len(params_dict["nb_hidden"])
+            * len(params_dict["nb_epochs"])
+            * len(params_dict["lr"])
+        )
+        logging.info(f"total model: {total_model}")
+
+        count = 0
+        for nb_hidden in params_dict["nb_hidden"]:
+            for epochs in params_dict["nb_epochs"]:
+                for lr in params_dict["lr"]:
+                    count += 1
+                    logging.info(
+                        f"[{count}/{total_model}] {nb_hidden}_{epochs}_{lr} model running."
+                    )
+                    logging.info(f"hidden Layer: {nb_hidden}")
+                    logging.info(f"Epochs: {epochs}")
+                    logging.info(f"lr: {lr}")
+
+                    cls.nb_hidden = nb_hidden
+                    cls.nb_epochs = epochs
+                    cls.lr = lr
+                    cls.set_layers_weight_list()
+
+                    start = time.time()
+                    result = cls.train(cls.x_train, cls.y_train)
+                    end = time.time()
+
+                    logging.info(f"Model End, Time: {end-start:.2f} sec")
+
+                    with open(
+                        f"result/{result[-1]}_{nb_hidden}_{epochs}_{lr}.pkl", "wb"
+                    ) as file:
+                        pickle.dump(result, file=file)
+
+                    logging.info(
+                        f"save pickle: result/{result[-1]}_{nb_hidden}_{epochs}_{lr}.pkl"
+                    )
+
 
 if __name__ == "__main__":
-    from SpikingNeuralNetwork import Tutorial3_SNN_Runner
-    import numpy as np
-    import torch
-    import logging
-
-    Tutorial3_SNN_Runner.set_download_FashionMNIST()
-    Tutorial3_SNN_Runner.set_pytorch_device()
-
-    logging.info(
-        f"Data Size: {Tutorial3_SNN_Runner.x_train.shape} {Tutorial3_SNN_Runner.x_test.shape}"
-    )
-
     seed = 1004
     np.random.seed(seed)
     torch.manual_seed(seed)
 
-    nb_hidden = [[100]]
-    nb_epochs = [5, 10, 15, 50, 100]
+    params = {
+        "nb_hidden": [
+            [50, 50],
+            [50, 50, 50],
+            [50],
+            [100],
+            [200],
+            [100, 100],
+            [200, 200],
+            [100, 100, 100],
+            [200, 200, 200],
+        ],
+        "nb_epochs": [5, 10, 15, 50, 100],
+        "lr": [1e-1, 1e-2, 1e-3, 1e-4, 1e-5],
+    }
 
-    for hidden in nb_hidden:
-        for epochs in nb_epochs:
-            Tutorial3_SNN_Runner.nb_hidden = hidden
-            Tutorial3_SNN_Runner.nb_epochs = epochs
-            Tutorial3_SNN_Runner.set_layers_weight_list()
-            Tutorial3_SNN_Runner.train(
-                Tutorial3_SNN_Runner.x_train, Tutorial3_SNN_Runner.y_train
-            )
+    Tutorial3_SNN_Runner.trainer(params_dict=params)
