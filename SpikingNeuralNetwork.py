@@ -3,7 +3,6 @@ import numpy as np
 import torchvision
 import os
 import logging
-import time
 
 from SurrogateGradient import SurrogateGradientSpike
 
@@ -20,19 +19,22 @@ logging.basicConfig(
 
 class Tutorial3_SNN_Runner:
     nb_inputs = 28 * 28  # 입력크기
-    nb_hidden = [100]  # 은닉층
+    nb_hidden = [100]  # 은닉층 param
     nb_outputs = 10  # 출력층
     time_step = 1e-3  # 단위시간
     nb_steps = 100  # 시간스텝
     batch_size = 256  # 배치크기
-    nb_epochs = 10
+    nb_epochs = 10  # 반복횟수 param
     dtype = torch.float
     tau_mem = 10e-3
     tau_syn = 5e-3
+    lr = 1e-3  # 학습률 param
     alpha = float(np.exp(-time_step / tau_syn))  # He 초기값
     beta = float(np.exp(-time_step / tau_mem))  # He 초기값
     weight_scale = 0.2  # He 초기값
     weight_list = None
+    w1 = None
+    w2 = None
     device = None
     spike_fn = SurrogateGradientSpike.apply
     x_train = None
@@ -163,9 +165,8 @@ class Tutorial3_SNN_Runner:
     def set_layers_weight_list(cls):
         weight_list = []
 
-        # 입력 -> 첫 번째 은닉층 가중치
         w1 = torch.empty(
-            (cls.nb_inputs, cls.nb_hidden[0]),  # 수정: (784, 100)로 설정
+            (cls.nb_inputs, cls.nb_hidden[0]),
             device=cls.device,
             dtype=cls.dtype,
             requires_grad=True,
@@ -173,46 +174,36 @@ class Tutorial3_SNN_Runner:
         torch.nn.init.normal_(
             w1, mean=0.0, std=cls.weight_scale / np.sqrt(cls.nb_inputs)
         )
-        weight_list.append(w1)
+        cls.w1 = w1
 
-        # 나머지 은닉층 가중치
-        for layer in range(1, len(cls.nb_hidden)):
-            w = torch.empty(
-                (
-                    cls.nb_hidden[layer - 1],
-                    cls.nb_hidden[layer],
-                ),  # 수정: 이전 은닉층 -> 현재 은닉층
+        for i in range(1, len(cls.nb_hidden)):
+            weight = torch.empty(
+                (cls.nb_hidden[i - 1], cls.nb_hidden[i]),
                 device=cls.device,
                 dtype=cls.dtype,
                 requires_grad=True,
             )
             torch.nn.init.normal_(
-                w, mean=0.0, std=cls.weight_scale / np.sqrt(cls.nb_hidden[layer - 1])
+                weight, mean=0.0, std=cls.weight_scale / np.sqrt(cls.nb_inputs)
             )
-            weight_list.append(w)
+            weight_list.append(weight)
 
-        # 마지막 은닉층 -> 출력층 가중치
-        w_out = torch.empty(
-            (cls.nb_hidden[-1], cls.nb_outputs),  # 수정: 마지막 은닉층 -> 출력층
+        cls.weight_list = weight_list
+
+        w2 = torch.empty(
+            (cls.nb_hidden[-1], cls.nb_outputs),
             device=cls.device,
             dtype=cls.dtype,
             requires_grad=True,
         )
         torch.nn.init.normal_(
-            w_out, mean=0.0, std=cls.weight_scale / np.sqrt(cls.nb_hidden[-1])
+            w2, mean=0.0, std=cls.weight_scale / np.sqrt(cls.nb_hidden[-1])
         )
-        weight_list.append(w_out)
-
-        cls.weight_list = weight_list
+        cls.w2 = w2
 
     @classmethod
-    def run_snn(cls, inputs):
-        spk_rec_list = []
-        mem_rec_list = []
-
-        h = torch.einsum(
-            "abc,cd->abd", (inputs, cls.weight_list[0])
-        )  # 수정: 입력 -> 첫 번째 은닉층
+    def run_snn_h1(cls, inputs):
+        h1 = torch.einsum("abc,cd->abd", (inputs, cls.w1))
         syn = torch.zeros(
             (cls.batch_size, cls.nb_hidden[0]), device=cls.device, dtype=cls.dtype
         )
@@ -223,12 +214,13 @@ class Tutorial3_SNN_Runner:
         mem_rec = []
         spk_rec = []
 
+        # Compute hidden layer activity
         for t in range(cls.nb_steps):
             mthr = mem - 1.0
             out = cls.spike_fn(mthr)
-            rst = out.detach()
+            rst = out.detach()  # We do not want to backprop through the reset
 
-            new_syn = cls.alpha * syn + h[:, t]
+            new_syn = cls.alpha * syn + h1[:, t]
             new_mem = (cls.beta * mem + syn) * (1.0 - rst)
 
             mem_rec.append(mem)
@@ -240,55 +232,17 @@ class Tutorial3_SNN_Runner:
         mem_rec = torch.stack(mem_rec, dim=1)
         spk_rec = torch.stack(spk_rec, dim=1)
 
-        spk_rec_list.append(spk_rec)
-        mem_rec_list.append(mem_rec)
-
-        # 수정: 추가적인 은닉층 처리
-        for i in range(1, len(cls.weight_list) - 1):
-            h = torch.einsum("abc,cd->abd", (spk_rec_list[-1], cls.weight_list[i]))
-            syn = torch.zeros(
-                (cls.batch_size, cls.nb_hidden[i]), device=cls.device, dtype=cls.dtype
-            )
-            mem = torch.zeros(
-                (cls.batch_size, cls.nb_hidden[i]), device=cls.device, dtype=cls.dtype
-            )
-
-            mem_rec = []
-            spk_rec = []
-
-            for t in range(cls.nb_steps):
-                mthr = mem - 1.0
-                out = cls.spike_fn(mthr)
-                rst = out.detach()
-
-                new_syn = cls.alpha * syn + h[:, t]
-                new_mem = (cls.beta * mem + syn) * (1.0 - rst)
-
-                mem_rec.append(mem)
-                spk_rec.append(out)
-
-                mem = new_mem
-                syn = new_syn
-
-            mem_rec = torch.stack(mem_rec, dim=1)
-            spk_rec = torch.stack(spk_rec, dim=1)
-
-            spk_rec_list.append(spk_rec)
-            mem_rec_list.append(mem_rec)
-
-        h_out = torch.einsum(
-            "abc,cd->abd", (spk_rec_list[-1], cls.weight_list[-1])
-        )  # 수정: 마지막 은닉층 -> 출력층
+        # Readout layer
+        h2 = torch.einsum("abc,cd->abd", (spk_rec, cls.w2))
         flt = torch.zeros(
             (cls.batch_size, cls.nb_outputs), device=cls.device, dtype=cls.dtype
         )
         out = torch.zeros(
             (cls.batch_size, cls.nb_outputs), device=cls.device, dtype=cls.dtype
         )
-
         out_rec = [out]
         for t in range(cls.nb_steps):
-            new_flt = cls.alpha * flt + h_out[:, t]
+            new_flt = cls.alpha * flt + h2[:, t]
             new_out = cls.beta * out + flt
 
             flt = new_flt
@@ -297,69 +251,50 @@ class Tutorial3_SNN_Runner:
             out_rec.append(out)
 
         out_rec = torch.stack(out_rec, dim=1)
-
-        return out_rec, [mem_rec_list, spk_rec_list]
+        other_recs = [mem_rec, spk_rec]
+        return out_rec, other_recs
 
     @classmethod
-    def train(
-        cls,
-        x_data,
-        y_data,
-        lr=1e-3,
-    ):
-        params = cls.weight_list  # 모든 가중치 리스트를 최적화 파라미터로 전달
+    def train(cls, x_data, y_data, lr=1e-3, nb_epochs=10):
+
+        if len(cls.nb_hidden) == 1:
+            snn_runner = cls.run_snn_h1
+
+        params = [cls.w1, cls.w2]
         optimizer = torch.optim.Adamax(params, lr=lr, betas=(0.9, 0.999))
 
         log_softmax_fn = torch.nn.LogSoftmax(dim=1)
         loss_fn = torch.nn.NLLLoss()
 
-        logging.info(f"Training Start, Device: {cls.device}")
-        logging.info(f"Epochs: {cls.nb_epochs}")
-        logging.info(f"Hidden Layer: {cls.nb_hidden}")
-        logging.info(f"Batch Size: {cls.batch_size}")
-        start = time.time()
-
         loss_hist = []
-        for e in range(cls.nb_epochs):
+        for e in range(nb_epochs):
             local_loss = []
             for x_local, y_local in cls.sparse_data_generator(
                 x_data, y_data, cls.batch_size, cls.nb_steps, cls.nb_inputs
             ):
-                output, recs = cls.run_snn(x_local.to_dense())
-                mem_recs, spks = recs  # 스파이크 기록
-
-                # spks 리스트를 하나의 텐서로 결합
-                spks_combined = torch.cat(
-                    spks, dim=2
-                )  # 은닉층별 스파이크 텐서를 하나로 결합
-
+                output, recs = snn_runner(x_local.to_dense())
+                _, spks = recs
                 m, _ = torch.max(output, 1)
                 log_p_y = log_softmax_fn(m)
 
-                # 규제 항목 추가 (스파이크 억제)
-                reg_loss = 1e-5 * torch.sum(
-                    spks_combined
-                )  # 전체 스파이크 수에 대한 L1 정규화
+                # Here we set up our regularizer loss
+                # The strength paramters here are merely a guess and there should be ample room for improvement by
+                # tuning these paramters.
+                reg_loss = 1e-5 * torch.sum(spks)  # L1 loss on total number of spikes
                 reg_loss += 1e-5 * torch.mean(
-                    torch.sum(torch.sum(spks_combined, dim=0), dim=0) ** 2
-                )  # 뉴런당 스파이크 수에 대한 L2 정규화
+                    torch.sum(torch.sum(spks, dim=0), dim=0) ** 2
+                )  # L2 loss on spikes per neuron
 
-                # 손실 함수 계산 (정규화 항목 포함)
+                # Here we combine supervised loss and the regularizer
                 loss_val = loss_fn(log_p_y, y_local) + reg_loss
 
                 optimizer.zero_grad()
                 loss_val.backward()
                 optimizer.step()
                 local_loss.append(loss_val.item())
-
             mean_loss = np.mean(local_loss)
-            # print(f"Epoch {e + 1}: loss = {mean_loss:.5f}")
+            logging.info(f"Epoch: {e+1} loss={mean_loss:.5f}")
             loss_hist.append(mean_loss)
-
-            logging.info(f"Epoch {e + 1}: loss = {mean_loss:.5f}")
-
-        end = time.time()
-        logging.info(f"Training End, Execution Time: {(end - start):.2f}")
 
         return loss_hist
 
@@ -376,3 +311,33 @@ class Tutorial3_SNN_Runner:
             tmp = np.mean((y_local == am).detach().cpu().numpy())  # compare to labels
             accs.append(tmp)
         return np.mean(accs)
+
+
+if __name__ == "__main__":
+    from SpikingNeuralNetwork import Tutorial3_SNN_Runner
+    import numpy as np
+    import torch
+    import logging
+
+    Tutorial3_SNN_Runner.set_download_FashionMNIST()
+    Tutorial3_SNN_Runner.set_pytorch_device()
+
+    logging.info(
+        f"Data Size: {Tutorial3_SNN_Runner.x_train.shape} {Tutorial3_SNN_Runner.x_test.shape}"
+    )
+
+    seed = 1004
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    nb_hidden = [[100]]
+    nb_epochs = [5, 10, 15, 50, 100]
+
+    for hidden in nb_hidden:
+        for epochs in nb_epochs:
+            Tutorial3_SNN_Runner.nb_hidden = hidden
+            Tutorial3_SNN_Runner.nb_epochs = epochs
+            Tutorial3_SNN_Runner.set_layers_weight_list()
+            Tutorial3_SNN_Runner.train(
+                Tutorial3_SNN_Runner.x_train, Tutorial3_SNN_Runner.y_train
+            )
