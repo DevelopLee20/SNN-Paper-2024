@@ -1,5 +1,6 @@
 import os
 import h5py
+
 import numpy as np
 import logging
 import time
@@ -625,9 +626,9 @@ params = {
         [100, 100],
         [200, 200],
     ],
-    "nb_steps": [100, 150, 200, 300],
+    "nb_steps": [50, 100, 150, 200],
     "scale": [50, 100, 150],
-    "nb_epochs": [5, 10, 15, 30],
+    "nb_epochs": [100, 150, 200, 300],
     "lr": [1e-1, 1e-2, 1e-3, 1e-5],
 }
 
