@@ -626,10 +626,10 @@ params = {
         [100, 100],
         [200, 200],
     ],
-    "nb_steps": [50, 100, 150, 200],
-    "scale": [50, 100, 150],
-    "nb_epochs": [100, 150, 200, 300],
-    "lr": [1e-1, 1e-2, 1e-3, 1e-5],
+    "nb_steps": [50, 100, 150],
+    "scale": [100],
+    "nb_epochs": [50, 100, 150],
+    "lr": [1e-2, 1e-3, 1e-4],
 }
 
 VoiceData_Tutorial_4.grid_search(params)
