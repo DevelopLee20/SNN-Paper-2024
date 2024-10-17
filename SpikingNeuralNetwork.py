@@ -165,8 +165,6 @@ class Tutorial3_SNN_Runner:
 
     @classmethod
     def set_layers_weight_list(cls):
-        weight_list = []
-
         w1 = torch.empty(
             (cls.nb_inputs, cls.nb_hidden[0]),
             device=cls.device,
@@ -177,20 +175,6 @@ class Tutorial3_SNN_Runner:
             w1, mean=0.0, std=cls.weight_scale / np.sqrt(cls.nb_inputs)
         )
         cls.w1 = w1
-
-        for i in range(1, len(cls.nb_hidden)):
-            weight = torch.empty(
-                (cls.nb_hidden[i - 1], cls.nb_hidden[i]),
-                device=cls.device,
-                dtype=cls.dtype,
-                requires_grad=True,
-            )
-            torch.nn.init.normal_(
-                weight, mean=0.0, std=cls.weight_scale / np.sqrt(cls.nb_inputs)
-            )
-            weight_list.append(weight)
-
-        cls.weight_list = weight_list
 
         w2 = torch.empty(
             (cls.nb_hidden[-1], cls.nb_outputs),
@@ -261,177 +245,14 @@ class Tutorial3_SNN_Runner:
 
     @classmethod
     def run_snn_h2(cls, inputs):
-        h1 = torch.einsum("abc,cd->abd", (inputs, cls.w1))
-        syn = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[0]), device=cls.device, dtype=cls.dtype
-        )
-        mem = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[0]), device=cls.device, dtype=cls.dtype
-        )
-
-        # 두 번째 은닉층에 대한 초기화
-        syn2 = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[1]), device=cls.device, dtype=cls.dtype
-        )
-        mem2 = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[1]), device=cls.device, dtype=cls.dtype
-        )
-
-        mem_rec = []
-        spk_rec = []
-
-        # Compute hidden layer activity
-        for t in range(cls.nb_steps):
-            # 첫 번째 은닉층 계산
-            mthr1 = mem - 1.0
-            out1 = cls.spike_fn(mthr1)
-            rst1 = out1.detach()  # 첫 번째 은닉층에서의 reset
-
-            new_syn1 = cls.alpha * syn + h1[:, t]
-            new_mem1 = (cls.beta * mem + syn) * (1.0 - rst1)
-
-            # 두 번째 은닉층 계산
-            h2_input = torch.einsum(
-                "ab,bc->ac", (out1, cls.weight_list[0])
-            )  # 첫 번째 은닉층 출력을 두 번째 은닉층으로
-            mthr2 = mem2 - 1.0
-            out2 = cls.spike_fn(mthr2)
-            rst2 = out2.detach()  # 두 번째 은닉층에서의 reset
-
-            new_syn2 = cls.alpha * syn2 + h2_input
-            new_mem2 = (cls.beta * mem2 + syn2) * (1.0 - rst2)
-
-            # 두 번째 은닉층 기록
-            mem_rec.append(mem2)
-            spk_rec.append(out2)
-
-            # 다음 스텝을 위한 값 업데이트
-            mem = new_mem1
-            syn = new_syn1
-            mem2 = new_mem2
-            syn2 = new_syn2
-
-        mem_rec = torch.stack(mem_rec, dim=1)
-        spk_rec = torch.stack(spk_rec, dim=1)
-
-        # Readout layer
-        h2 = torch.einsum("abc,cd->abd", (spk_rec, cls.w2))
-        flt = torch.zeros(
-            (cls.batch_size, cls.nb_outputs), device=cls.device, dtype=cls.dtype
-        )
-        out = torch.zeros(
-            (cls.batch_size, cls.nb_outputs), device=cls.device, dtype=cls.dtype
-        )
-        out_rec = [out]
-        for t in range(cls.nb_steps):
-            new_flt = cls.alpha * flt + h2[:, t]
-            new_out = cls.beta * out + flt
-
-            flt = new_flt
-            out = new_out
-
-            out_rec.append(out)
-
-        out_rec = torch.stack(out_rec, dim=1)
-        other_recs = [mem_rec, spk_rec]
-
-        return out_rec, other_recs
+        pass
 
     @classmethod
     def run_snn_h3(cls, inputs):
-        h1 = torch.einsum("abc,cd->abd", (inputs, cls.w1))
-        syn1 = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[0]), device=cls.device, dtype=cls.dtype
-        )
-        mem1 = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[0]), device=cls.device, dtype=cls.dtype
-        )
-
-        # 두 번째 은닉층
-        syn2 = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[1]), device=cls.device, dtype=cls.dtype
-        )
-        mem2 = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[1]), device=cls.device, dtype=cls.dtype
-        )
-
-        # 세 번째 은닉층
-        syn3 = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[2]), device=cls.device, dtype=cls.dtype
-        )
-        mem3 = torch.zeros(
-            (cls.batch_size, cls.nb_hidden[2]), device=cls.device, dtype=cls.dtype
-        )
-
-        mem_rec = []
-        spk_rec = []
-
-        for t in range(cls.nb_steps):
-            # 첫 번째 은닉층 계산
-            mthr1 = mem1 - 1.0
-            out1 = cls.spike_fn(mthr1)
-            rst1 = out1.detach()
-
-            new_syn1 = cls.alpha * syn1 + h1[:, t]
-            new_mem1 = (cls.beta * mem1 + syn1) * (1.0 - rst1)
-
-            # 두 번째 은닉층 계산
-            h2_input = torch.einsum("ab,bc->ac", (out1, cls.weight_list[0]))
-            mthr2 = mem2 - 1.0
-            out2 = cls.spike_fn(mthr2)
-            rst2 = out2.detach()
-
-            new_syn2 = cls.alpha * syn2 + h2_input
-            new_mem2 = (cls.beta * mem2 + syn2) * (1.0 - rst2)
-
-            # 세 번째 은닉층 계산
-            h3_input = torch.einsum("ab,bc->ac", (out2, cls.weight_list[1]))
-            mthr3 = mem3 - 1.0
-            out3 = cls.spike_fn(mthr3)
-            rst3 = out3.detach()
-
-            new_syn3 = cls.alpha * syn3 + h3_input
-            new_mem3 = (cls.beta * mem3 + syn3) * (1.0 - rst3)
-
-            mem_rec.append(mem3)
-            spk_rec.append(out3)
-
-            mem1 = new_mem1
-            syn1 = new_syn1
-            mem2 = new_mem2
-            syn2 = new_syn2
-            mem3 = new_mem3
-            syn3 = new_syn3
-
-        mem_rec = torch.stack(mem_rec, dim=1)
-        spk_rec = torch.stack(spk_rec, dim=1)
-
-        # Readout layer
-        h_out = torch.einsum("abc,cd->abd", (spk_rec, cls.w2))
-        flt = torch.zeros(
-            (cls.batch_size, cls.nb_outputs), device=cls.device, dtype=cls.dtype
-        )
-        out = torch.zeros(
-            (cls.batch_size, cls.nb_outputs), device=cls.device, dtype=cls.dtype
-        )
-        out_rec = [out]
-
-        for t in range(cls.nb_steps):
-            new_flt = cls.alpha * flt + h_out[:, t]
-            new_out = cls.beta * out + flt
-
-            flt = new_flt
-            out = new_out
-            out_rec.append(out)
-
-        out_rec = torch.stack(out_rec, dim=1)
-        other_recs = [mem_rec, spk_rec]
-
-        return out_rec, other_recs
+        pass
 
     @classmethod
     def train(cls, x_data, y_data, lr=1e-3, nb_epochs=10):
-
         if len(cls.nb_hidden) == 1:
             snn_runner = cls.run_snn_h1
             params = [cls.w1, cls.w2]
