@@ -13,7 +13,7 @@ logging.basicConfig(
     level=logging.DEBUG,  # 로그 레벨 설정
     format="%(asctime)s - %(levelname)s - %(message)s",  # 로그 메시지 형식
     handlers=[
-        logging.FileHandler("Fasion-MNIST-Runner.log"),  # 로그를 기록할 파일 설정
+        logging.FileHandler("logs/Fasion-MNIST-Runner.log"),  # 로그를 기록할 파일 설정
         logging.StreamHandler(),  # 콘솔에 로그 출력
     ],
 )
@@ -329,10 +329,10 @@ class FasionMNISTRunner:
         파일이 이미 존재하면 덮어쓰지 않고 내용을 추가하여 한 줄씩 기록.
         """
         # CSV 파일이 없는 경우, 헤더를 포함한 새 파일 생성
-        file_exists = os.path.exists("train_result_Fasion_MNIST.csv")
+        file_exists = os.path.exists("csv/train_result_Fasion_MNIST.csv")
 
         with open(
-            "train_result_Fasion_MNIST.csv", mode="a", newline=""
+            "csv/train_result_Fasion_MNIST.csv", mode="a", newline=""
         ) as file:  # 'a' 모드로 파일에 내용 추가
             writer = csv.writer(file)
 
