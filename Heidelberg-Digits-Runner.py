@@ -387,9 +387,9 @@ if __name__ == "__main__":
     params = {
         "hidden_node": [200, 150, 250],
         "steps": [100, 75, 125],
-        "scale": [100, 95, 105],
-        "epochs": [200, 250, 300],
-        "lr": [2e-4, 1e-4, 3e-4],
+        "scale": [100, 90, 110],
+        "epochs": [250],
+        "lr": [2e-4],
         "regularizer": [2e-6, 1e-6, 3e-6],
     }
     runner = HeidelbergDigitsRunner()

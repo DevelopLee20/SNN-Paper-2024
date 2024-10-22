@@ -282,9 +282,6 @@ class FasionMNISTRunner:
                 m, _ = torch.max(output, 1)
                 log_p_y = cls.log_softmax_fn(m)
 
-                # Here we set up our regularizer loss
-                # The strength paramters here are merely a guess and there should be ample room for improvement by
-                # tuning these paramters.
                 reg_loss = cls.regularizer * torch.sum(
                     spks
                 )  # L1 loss on total number of spikes
@@ -292,7 +289,6 @@ class FasionMNISTRunner:
                     torch.sum(torch.sum(spks, dim=0), dim=0) ** 2
                 )  # L2 loss on spikes per neuron
 
-                # Here we combine supervised loss and the regularizer
                 loss_val = cls.loss_fn(log_p_y, y_local) + reg_loss
 
                 optimizer.zero_grad()
@@ -382,10 +378,10 @@ if __name__ == "__main__":
     params = {
         "hidden_node": [100, 75, 125],
         "steps": [100, 75, 125],
-        "scale": [100, 95, 105],
-        "epochs": [30, 50, 100],
-        "lr": [2e-4, 1e-4, 3e-4],
-        "regularizer": [1e-5, 1e-4, 1e-6],
+        "scale": [100, 90, 110],
+        "epochs": [30],
+        "lr": [2e-4],
+        "regularizer": [1e-5, 2e-5, 5e-6],
     }
     runner = FasionMNISTRunner()
 
