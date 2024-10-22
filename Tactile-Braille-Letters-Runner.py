@@ -56,11 +56,13 @@ class TactileBrailleLettersRunner:
     w2 = None
     v1 = None
     spike_fn = None
+    nzid = None
+    labels = None
 
     @classmethod
     def __init__(cls):
         cls.set_device()
-        cls.set_datasets_and_network_params()
+        cls.set_datasets()
 
     @classmethod
     def set_spike_fn(cls, scale):
@@ -103,7 +105,7 @@ class TactileBrailleLettersRunner:
             cls.device = torch.device("cpu")
 
     @classmethod
-    def set_datasets_and_network_params(cls):
+    def set_datasets(cls):
         file_name = "tutorial5_braille_spiking_data.pkl.gz"
         with gzip.open(file_name, "rb") as infile:
             data_dict = pickle.load(infile)
@@ -186,23 +188,8 @@ class TactileBrailleLettersRunner:
         cls.ds_train = TensorDataset(x_train, y_train)
         cls.ds_test = TensorDataset(x_test, y_test)
 
-        nb_channels = len(nzid)
-
-        # Network parameters
-        cls.nb_inputs = nb_channels * cls.enc_fan_out
-        cls.nb_outputs = len(np.unique(labels)) + 1
-        time_step = (
-            2e-3 / cls.nb_upsample
-        )  # TODO needs to be updated to reflect the correct time scale
-        cls.nb_steps = (
-            cls.nb_upsample * cls.data_steps
-        )  # TODO We should change this and upsample the input data
-
-        tau_mem = 20e-3
-        tau_syn = 10e-3
-
-        cls.alpha = float(np.exp(-time_step / tau_syn))
-        cls.beta = float(np.exp(-time_step / tau_mem))
+        cls.nzid = nzid
+        cls.labels = labels
 
     @classmethod
     def set_weights(cls):
@@ -252,6 +239,24 @@ class TactileBrailleLettersRunner:
         torch.nn.init.normal_(
             cls.v1, mean=0.0, std=rec_weight_scale / np.sqrt(cls.nb_hidden)
         )
+
+        nb_channels = len(cls.nzid)
+
+        # Network parameters
+        cls.nb_inputs = nb_channels * cls.enc_fan_out
+        cls.nb_outputs = len(np.unique(cls.labels)) + 1
+        time_step = (
+            2e-3 / cls.nb_upsample
+        )  # TODO needs to be updated to reflect the correct time scale
+        cls.nb_steps = (
+            cls.nb_upsample * cls.data_steps
+        )  # TODO We should change this and upsample the input data
+
+        tau_mem = 20e-3
+        tau_syn = 10e-3
+
+        cls.alpha = float(np.exp(-time_step / tau_syn))
+        cls.beta = float(np.exp(-time_step / tau_mem))
 
     @classmethod
     def run_snn(cls, inputs):
