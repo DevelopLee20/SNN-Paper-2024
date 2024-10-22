@@ -193,6 +193,24 @@ class TactileBrailleLettersRunner:
 
     @classmethod
     def set_weights(cls):
+        nb_channels = len(cls.nzid)
+
+        # Network parameters
+        cls.nb_inputs = nb_channels * cls.enc_fan_out
+        cls.nb_outputs = len(np.unique(cls.labels)) + 1
+        time_step = (
+            2e-3 / cls.nb_upsample
+        )  # TODO needs to be updated to reflect the correct time scale
+        cls.nb_steps = (
+            cls.nb_upsample * cls.data_steps
+        )  # TODO We should change this and upsample the input data
+
+        tau_mem = 20e-3
+        tau_syn = 10e-3
+
+        cls.alpha = float(np.exp(-time_step / tau_syn))
+        cls.beta = float(np.exp(-time_step / tau_mem))
+
         encoder_weight_scale = 1.0
         fwd_weight_scale = 3.0
         rec_weight_scale = 1e-2 * fwd_weight_scale
@@ -239,24 +257,6 @@ class TactileBrailleLettersRunner:
         torch.nn.init.normal_(
             cls.v1, mean=0.0, std=rec_weight_scale / np.sqrt(cls.nb_hidden)
         )
-
-        nb_channels = len(cls.nzid)
-
-        # Network parameters
-        cls.nb_inputs = nb_channels * cls.enc_fan_out
-        cls.nb_outputs = len(np.unique(cls.labels)) + 1
-        time_step = (
-            2e-3 / cls.nb_upsample
-        )  # TODO needs to be updated to reflect the correct time scale
-        cls.nb_steps = (
-            cls.nb_upsample * cls.data_steps
-        )  # TODO We should change this and upsample the input data
-
-        tau_mem = 20e-3
-        tau_syn = 10e-3
-
-        cls.alpha = float(np.exp(-time_step / tau_syn))
-        cls.beta = float(np.exp(-time_step / tau_mem))
 
     @classmethod
     def run_snn(cls, inputs):
