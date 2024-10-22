@@ -23,12 +23,13 @@ class FasionMNISTRunner:
     # Hyper Parameters
     nb_hidden = 100
     nb_steps = 100
-    batch_size = 256
     regularizer = 1e-5
     lr = 1e-3
     nb_epochs = 30
+    # scale =
 
     # Constrant Parameters
+    batch_size = 256
     nb_inputs = 28 * 28
     nb_outputs = 10
     time_step = 1e-3
@@ -308,7 +309,7 @@ class FasionMNISTRunner:
     def compute_classification_accuracy(cls, x_data, y_data):
         accs = []
         for x_local, y_local in cls.sparse_data_generator(
-            x_data, y_data, cls.batch_size, cls.nb_steps, cls.nb_inputs, shuffle=False
+            x_data, y_data, shuffle=False
         ):
             output, _ = cls.run_snn(x_local.to_dense())
             m, _ = torch.max(output, 1)
