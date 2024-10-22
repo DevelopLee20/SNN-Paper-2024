@@ -379,12 +379,12 @@ if __name__ == "__main__":
     torch.manual_seed(seed)
 
     params = {
-        "hidden_node": [75, 100, 125],
-        "steps": [75, 100, 125],
-        "scale": [95, 100, 105],
+        "hidden_node": [100, 75, 125],
+        "steps": [100, 75, 125],
+        "scale": [100, 95, 105],
         "epochs": [30, 50, 100],
-        "lr": [1e-4, 2e-4, 3e-4],
-        "regularizer": [1e-4, 1e-5, 1e-6],
+        "lr": [2e-4, 1e-4, 3e-4],
+        "regularizer": [1e-5, 1e-4, 1e-6],
     }
     runner = FasionMNISTRunner()
 
