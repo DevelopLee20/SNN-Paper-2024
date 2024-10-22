@@ -62,7 +62,6 @@ class TactileBrailleLettersRunner:
     @classmethod
     def __init__(cls):
         cls.set_device()
-        cls.set_datasets()
 
     @classmethod
     def set_spike_fn(cls, scale):
@@ -79,10 +78,7 @@ class TactileBrailleLettersRunner:
         정규화 손실 상수
         """
         cls.nb_hidden = params["hidden_node"]
-
         cls.nb_upsample = params["upsample"]
-        cls.nb_steps = cls.nb_upsample * cls.data_steps
-
         cls.set_spike_fn(scale=params["scale"])
         cls.nb_epochs = params["epochs"]
         cls.lr = params["lr"]
@@ -91,7 +87,6 @@ class TactileBrailleLettersRunner:
         logging.info("Parameters Option============")
         logging.info(f"hidden node: {params['hidden_node']}")
         logging.info(f"upsample: {params['upsample']}")
-        logging.info(f"step: {cls.nb_steps}")
         logging.info(f"surrogate scale: {params['scale']}")
         logging.info(f"epochs: {params['epochs']}")
         logging.info(f"learning rate: {params['lr']}")
@@ -153,6 +148,8 @@ class TactileBrailleLettersRunner:
 
         # Crop to same length
         cls.data_steps = lett = np.min([len(d) for d in data])
+        cls.nb_steps = cls.nb_upsample * cls.data_steps
+        logging.info(f"step: {cls.nb_steps}")
         data_np = np.array([d[:lett] for d in data])
         data = torch.tensor(data_np, dtype=cls.dtype)
         labels = torch.tensor(labels, dtype=torch.long)
@@ -191,8 +188,6 @@ class TactileBrailleLettersRunner:
         cls.nzid = nzid
         cls.labels = labels
 
-    @classmethod
-    def set_weights(cls):
         nb_channels = len(cls.nzid)
 
         # Network parameters
@@ -273,7 +268,7 @@ class TactileBrailleLettersRunner:
         mem_rec = []
         spk_rec = []
 
-        # encoder_currents = torch.einsum("abc,c->ab", (inputs.tile((enc_fan_out,)), enc_gain))+enc_bias
+        # encoder_currents = torch.einsum("abc,c->ab", (inputs.tile((cls.enc_fan_out,)), cls.enc_gain))+cls.enc_bias
         encoder_currents = cls.enc_gain * (
             inputs.tile((cls.enc_fan_out,)) + cls.enc_bias
         )
@@ -438,7 +433,7 @@ class TactileBrailleLettersRunner:
     @classmethod
     def runner(cls, params: dict):
         cls.set_params(params)
-        cls.set_weights()
+        cls.set_datasets()
 
         start = time.time()
         loss_hist = cls.train(cls.ds_train)
@@ -478,11 +473,11 @@ if __name__ == "__main__":
     )
     count = 0
     for h_node in params["hidden_node"]:
-        for upsample in params["upsample"]:
+        for regular in params["regularizer"]:
             for scale in params["scale"]:
                 for epoch in params["epochs"]:
                     for lr in params["lr"]:
-                        for regular in params["regularizer"]:
+                        for upsample in params["upsample"]:
                             param = {
                                 "hidden_node": h_node,
                                 "upsample": upsample,
