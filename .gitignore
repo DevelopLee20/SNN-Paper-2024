@@ -166,3 +166,4 @@ cython_debug/
 utils.py
 *.ipynb
 /datasets
+*.gz

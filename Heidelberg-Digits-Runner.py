@@ -387,14 +387,21 @@ if __name__ == "__main__":
     params = {
         "hidden_node": [200, 150, 250],
         "steps": [100, 75, 125],
-        "scale": [100, 90, 110],
+        "scale": [100.0, 90.0, 110.0],
         "epochs": [250],
         "lr": [2e-4],
         "regularizer": [2e-6, 1e-6, 3e-6],
     }
     runner = HeidelbergDigitsRunner()
 
-    total_count = 729
+    total_count = (
+        len(params["hidden_node"])
+        * len(params["steps"])
+        * len(params["scale"])
+        * len(params["epochs"])
+        * len(params["lr"])
+        * len(params["regularizer"])
+    )
     count = 0
     for h_node in params["hidden_node"]:
         for steps in params["steps"]:

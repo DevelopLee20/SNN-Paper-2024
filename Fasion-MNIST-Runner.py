@@ -378,14 +378,21 @@ if __name__ == "__main__":
     params = {
         "hidden_node": [100, 75, 125],
         "steps": [100, 75, 125],
-        "scale": [100, 90, 110],
+        "scale": [100.0, 90.0, 110.0],
         "epochs": [30],
         "lr": [2e-4],
         "regularizer": [1e-5, 2e-5, 5e-6],
     }
     runner = FasionMNISTRunner()
 
-    total_count = 729
+    total_count = (
+        len(params["hidden_node"])
+        * len(params["steps"])
+        * len(params["scale"])
+        * len(params["epochs"])
+        * len(params["lr"])
+        * len(params["regularizer"])
+    )
     count = 0
     for h_node in params["hidden_node"]:
         for steps in params["steps"]:
