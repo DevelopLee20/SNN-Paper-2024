@@ -15,7 +15,9 @@ logging.basicConfig(
     level=logging.DEBUG,  # 로그 레벨 설정
     format="%(asctime)s - %(levelname)s - %(message)s",  # 로그 메시지 형식
     handlers=[
-        logging.FileHandler("logs/Tactile-Braille-Letters-Runner.log"),  # 로그를 기록할 파일 설정
+        logging.FileHandler(
+            "logs/Tactile-Braille-Letters-Runner.log"
+        ),  # 로그를 기록할 파일 설정
         logging.StreamHandler(),  # 콘솔에 로그 출력
     ],
 )
@@ -454,12 +456,12 @@ if __name__ == "__main__":
     torch.manual_seed(seed)
 
     params = {
-        "hidden_node": [200, 150, 250],
+        "hidden_node": [200, 100, 300],
         "upsample": [2, 1, 3],
-        "scale": [20.0, 25.0, 15.0],
+        "scale": [20.0, 30.0, 10.0],
         "epochs": [100],
         "lr": [1e-2],
-        "regularizer": [1e-3, 2e-3, 5e-4],
+        "regularizer": [1e-3, 1e-2, 1e-4],
     }
     runner = TactileBrailleLettersRunner()
 

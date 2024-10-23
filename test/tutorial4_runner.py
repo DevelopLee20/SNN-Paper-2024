@@ -366,7 +366,9 @@ class VoiceData_Tutorial_4:
         # CSV 파일이 없는 경우, 헤더를 포함한 새 파일 생성
         file_exists = os.path.exists(filename)
 
-        with open(filename, mode="a", newline="") as file:  # 'a' 모드로 파일에 내용 추가
+        with open(
+            filename, mode="a", newline=""
+        ) as file:  # 'a' 모드로 파일에 내용 추가
             writer = csv.writer(file)
 
             # 파일이 처음 생성된 경우 헤더 작성
